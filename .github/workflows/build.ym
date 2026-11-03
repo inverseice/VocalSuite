@@ -6,20 +6,34 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
-      - name: Get the code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: choco install ninja -y
+
+      - name: Set up the Visual C++ compiler
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Configure
-        run: cmake -B build -A x64
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build (Release)
-        run: cmake --build build --config Release --parallel
+      - name: Build
+        run: cmake --build build --parallel
 
-      - name: Upload the finished plugin
-        uses: actions/upload-artifact@v4
+      - name: Collect the plugin
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          $d = Get-ChildItem -Path build -Recurse -Directory -Filter VST3 | Select-Object -First 1
+          Copy-Item -Path "$($d.FullName)\*" -Destination out -Recurse
+          Get-ChildItem out -Recurse | Select-Object -First 20 FullName
+
+      - uses: actions/upload-artifact@v4
         with:
           name: VocalSuite-VST3
-          path: build/VocalSuite_artefacts/Release/VST3/
+          path: out/
           if-no-files-found: error
